@@ -1,0 +1,6 @@
+{
+  "name": "مراقبه عهد الصيدله",
+  "description": "منصة ذكية متقدمة لإدارة ومراقبة عهد وأقسام الصيدلة، تدعم رفع واستعراض وطباعة ملفات الـ PDF، الصور، الفيديوهات، والروابط مع مزامنة سحابية ودعم وضع عدم الاتصال والوضع الليلي.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
