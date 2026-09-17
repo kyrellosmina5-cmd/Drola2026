@@ -14,7 +14,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { Section, CustodyItem, PharmacySettings } from '../types';
-import { exportDatabaseBackup, importDatabaseBackup, addAuditLog } from '../utils/storage';
+import { exportDatabaseBackup, importDatabaseBackup, addAuditLog, pushAllToCloudServer, syncWithCloudServer } from '../utils/storage';
 
 interface CloudSyncModalProps {
   isOpen: boolean;
@@ -101,15 +101,23 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     }
   };
 
-  const handleManualSync = () => {
+  const handleManualSync = async () => {
     setIsSyncing(true);
     setErrorMessage('');
-    setTimeout(() => {
-      setIsSyncing(false);
+    try {
+      // First push local data to server
+      await pushAllToCloudServer();
+      // Then sync from server
+      await syncWithCloudServer();
       setSyncSuccess(true);
-      setStatusMessage('تمت المزامنة السحابية بنجاح وتحديث كافة السجلات المحلية.');
+      setStatusMessage('تمت المزامنة السحابية بنجاح وحفظ كافة التعديلات في الخادم السحابي.');
+      onDataRestored();
       setTimeout(() => setSyncSuccess(false), 4000);
-    }, 1200);
+    } catch {
+      setErrorMessage('فشلت المزامنة السحابية. يرجى التحقق من اتصال الشبكة.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (

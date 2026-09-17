@@ -16,10 +16,12 @@ import {
   ShieldCheck,
   Clock,
   Sparkles,
-  Trash2
+  Trash2,
+  Share2
 } from 'lucide-react';
 import { CustodyItem } from '../types';
 import { formatBytes, formatDateArabic, downloadFile, printFileContent } from '../utils/fileHelpers';
+import { copyToClipboard, formatCustodyItemShareText } from '../utils/clipboardHelpers';
 
 interface FilePreviewModalProps {
   item: CustodyItem | null;
@@ -37,8 +39,41 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedDetails, setCopiedDetails] = useState(false);
 
   if (!item) return null;
+
+  const handleCopyCode = async () => {
+    if (item.custodyNumber) {
+      const success = await copyToClipboard(item.custodyNumber);
+      if (success) {
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      }
+    }
+  };
+
+  const handleCopyDetails = async () => {
+    const text = formatCustodyItemShareText(item, sectionName);
+    if (typeof navigator !== 'undefined' && 'share' in navigator && window.innerWidth < 768) {
+      try {
+        await navigator.share({
+          title: item.title,
+          text: text,
+        });
+        return;
+      } catch {
+        // Fallback to copy
+      }
+    }
+
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedDetails(true);
+      setTimeout(() => setCopiedDetails(false), 2500);
+    }
+  };
 
   const handleDownload = () => {
     if (item.type === 'link' && item.url) {
@@ -95,13 +130,57 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               <h3 className="text-base font-black text-slate-900 dark:text-white truncate">
                 {item.title}
               </h3>
-              <p className="text-xs text-slate-400">
-                {sectionName || 'القسم العام'} {item.custodyNumber && `• كود: ${item.custodyNumber}`}
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 flex-wrap">
+                <span>{sectionName || 'القسم العام'}</span>
+                {item.custodyNumber && (
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    title="انقر لنسخ كود العهدة بضغطة زر"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-teal-50 dark:bg-slate-800 dark:hover:bg-teal-950 text-slate-700 hover:text-teal-700 dark:text-slate-300 font-mono font-bold transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
+                  >
+                    {copiedCode ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-500 stroke-[2.5]" />
+                        <span className="text-emerald-600 dark:text-emerald-400 text-[11px]">تم نسخ الكود!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-slate-400" />
+                        <span>#{item.custodyNumber}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Share / Copy Details Button */}
+            <button
+              id="modal-share-details-btn"
+              onClick={handleCopyDetails}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-colors ${
+                copiedDetails
+                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+              title="نسخ بيانات العهدة كاملة للمراسلة الخارجية"
+            >
+              {copiedDetails ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                  <span>تم النسخ!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <span className="hidden sm:inline">نسخ ومشاركة</span>
+                </>
+              )}
+            </button>
+
             {/* Download Button */}
             <button
               onClick={handleDownload}

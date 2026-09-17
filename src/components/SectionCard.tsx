@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileText,
   Image as ImageIcon,
@@ -10,10 +10,14 @@ import {
   Printer,
   ChevronLeft,
   MapPin,
-  UserCheck
+  UserCheck,
+  Share2,
+  Check,
+  Copy
 } from 'lucide-react';
 import { Section, CustodyItem } from '../types';
 import { getSectionIcon, getColorTheme } from '../utils/icons';
+import { copyToClipboard, formatSectionShareText } from '../utils/clipboardHelpers';
 
 interface SectionCardProps {
   section: Section;
@@ -36,8 +40,32 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   onQuickUpload,
   onPrintSection,
 }) => {
+  const [copiedSection, setCopiedSection] = useState(false);
   const IconComponent = getSectionIcon(section.iconName);
   const theme = getColorTheme(section.color);
+
+  const handleCopySectionDetails = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = formatSectionShareText(section, items);
+
+    if (typeof navigator !== 'undefined' && 'share' in navigator && window.innerWidth < 768) {
+      try {
+        await navigator.share({
+          title: `كشف قسم ${section.name}`,
+          text: text,
+        });
+        return;
+      } catch {
+        // Fallback to clipboard
+      }
+    }
+
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedSection(true);
+      setTimeout(() => setCopiedSection(false), 2500);
+    }
+  };
 
   const pdfCount = items.filter(i => i.type === 'pdf').length;
   const imgCount = items.filter(i => i.type === 'image').length;
@@ -63,8 +91,25 @@ export const SectionCard: React.FC<SectionCardProps> = ({
             <IconComponent className="w-7 h-7 sm:w-8 sm:h-8" />
           </button>
 
-          {/* Right Action Icons (Edit, Delete, Print) */}
+          {/* Right Action Icons (Share/Copy, Print, Edit, Delete) */}
           <div className="flex items-center gap-1">
+            <button
+              id={`share-section-${section.id}`}
+              onClick={handleCopySectionDetails}
+              title="نسخ تفاصيل وحصر عهد هذا القسم للمراسلة الخارجية"
+              className={`p-1.5 rounded-xl transition-colors ${
+                copiedSection
+                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60'
+                  : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/40'
+              }`}
+            >
+              {copiedSection ? (
+                <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+            </button>
+
             <button
               id={`print-section-${section.id}`}
               onClick={(e) => {

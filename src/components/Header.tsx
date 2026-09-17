@@ -15,8 +15,10 @@ import {
   ClipboardList,
   Plus,
   FileUp,
+  Share2,
 } from 'lucide-react';
 import { PharmacySettings } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   darkMode: boolean;
@@ -33,6 +35,7 @@ interface HeaderProps {
   logsCount: number;
   onOpenNewSection: () => void;
   onOpenNewUpload: () => void;
+  onOpenShareModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -50,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   logsCount,
   onOpenNewSection,
   onOpenNewUpload,
+  onOpenShareModal,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -220,6 +224,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden xl:inline font-medium">طباعة التقرير</span>
               </button>
             )}
+
+            {/* Share and Publish Button */}
+            <button
+              id="header-share-btn"
+              onClick={onOpenShareModal}
+              title="نشر ومشاركة رابط المنظومة عبر واتساب وتيليجرام وQR Code"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 text-xs font-bold transition-all active:scale-95"
+            >
+              <Share2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span className="hidden sm:inline">نشر وشير</span>
+            </button>
+
+            {/* PWA Install Button */}
+            <PWAInstallButton variant="header" />
 
             {/* Settings Button */}
             <button

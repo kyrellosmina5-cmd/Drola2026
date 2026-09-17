@@ -8,9 +8,11 @@ import {
   Search,
   CheckCircle2,
   Plus,
-  FileUp
+  FileUp,
+  Share2
 } from 'lucide-react';
 import { Section, CustodyItem, FileType } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface DashboardStatsProps {
   sections: Section[];
@@ -22,6 +24,7 @@ interface DashboardStatsProps {
   isAdmin: boolean;
   onAddNewSection: () => void;
   onAddNewItem?: () => void;
+  onOpenShareModal?: () => void;
 }
 
 export const DashboardStats: React.FC<DashboardStatsProps> = ({
@@ -34,6 +37,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
   isAdmin,
   onAddNewSection,
   onAddNewItem,
+  onOpenShareModal,
 }) => {
   const pdfCount = items.filter(i => i.type === 'pdf').length;
   const imageCount = items.filter(i => i.type === 'image').length;
@@ -78,6 +82,20 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
               <span>رفع مستند / عهدة</span>
             </button>
           )}
+
+          {onOpenShareModal && (
+            <button
+              id="banner-share-btn"
+              onClick={onOpenShareModal}
+              title="نشر ومشاركة رابط المنظومة"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/25 font-bold text-sm shadow-md transition-all active:scale-95"
+            >
+              <Share2 className="w-4 h-4 text-teal-200" />
+              <span>نشر وشير</span>
+            </button>
+          )}
+
+          <PWAInstallButton variant="banner" />
         </div>
       </div>
 

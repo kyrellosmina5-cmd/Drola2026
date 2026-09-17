@@ -327,6 +327,15 @@ export async function getSections(): Promise<Section[]> {
 }
 
 export async function saveSection(section: Section): Promise<void> {
+  // Sync to server in background
+  if (typeof window !== 'undefined') {
+    fetch('/api/sections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(section),
+    }).catch((err) => console.warn('Cloud sync section update failed (offline):', err));
+  }
+
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -349,6 +358,13 @@ export async function saveSection(section: Section): Promise<void> {
 }
 
 export async function deleteSection(sectionId: string): Promise<void> {
+  // Sync to server in background
+  if (typeof window !== 'undefined') {
+    fetch(`/api/sections/${sectionId}`, {
+      method: 'DELETE',
+    }).catch((err) => console.warn('Cloud sync delete section failed (offline):', err));
+  }
+
   if (typeof window !== 'undefined') {
     localStorage.setItem('pharma_db_seeded', 'true');
     // Mirror to localStorage immediately
@@ -450,6 +466,15 @@ export async function getCustodyItems(sectionId?: string): Promise<CustodyItem[]
 }
 
 export async function saveCustodyItem(item: CustodyItem): Promise<void> {
+  // Sync to server in background
+  if (typeof window !== 'undefined') {
+    fetch('/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    }).catch((err) => console.warn('Cloud sync item update failed (offline):', err));
+  }
+
   if (typeof window !== 'undefined') {
     localStorage.setItem('pharma_db_seeded', 'true');
   }
@@ -475,6 +500,13 @@ export async function saveCustodyItem(item: CustodyItem): Promise<void> {
 }
 
 export async function deleteCustodyItem(itemId: string): Promise<void> {
+  // Sync to server in background
+  if (typeof window !== 'undefined') {
+    fetch(`/api/items/${itemId}`, {
+      method: 'DELETE',
+    }).catch((err) => console.warn('Cloud sync delete item failed (offline):', err));
+  }
+
   if (typeof window !== 'undefined') {
     localStorage.setItem('pharma_db_seeded', 'true');
     // Mirror to localStorage
@@ -535,6 +567,15 @@ export async function getSettings(): Promise<PharmacySettings> {
 }
 
 export async function saveSettings(settings: PharmacySettings): Promise<void> {
+  // Sync to server in background
+  if (typeof window !== 'undefined') {
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    }).catch((err) => console.warn('Cloud sync settings failed (offline):', err));
+  }
+
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -626,6 +667,15 @@ export async function addAuditLog(
     targetName: entry.targetName,
     sectionName: entry.sectionName,
   };
+
+  // Sync log to server in background
+  if (typeof window !== 'undefined') {
+    fetch('/api/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLog),
+    }).catch(() => {});
+  }
 
   try {
     const db = await openDB();
@@ -722,9 +772,103 @@ export async function importDatabaseBackup(jsonString: string): Promise<{ sectio
     setStore.put({ key: 'main_settings', value: data.settings });
   }
 
+  // Also push imported data to cloud server
+  if (typeof window !== 'undefined') {
+    fetch('/api/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: jsonString,
+    }).catch((err) => console.warn('Cloud server import failed (offline):', err));
+  }
+
   return {
     sectionsCount: data.sections.length,
     itemsCount: (data.items || []).length,
     logsCount: (data.logs || []).length,
   };
 }
+
+// ================= CLOUD SYNC & SHARING HELPERS =================
+
+export async function syncWithCloudServer(): Promise<{
+  synced: boolean;
+  sections?: Section[];
+  items?: CustodyItem[];
+  settings?: PharmacySettings;
+  logs?: AuditLog[];
+}> {
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.success && json.data) {
+      const { sections, items, settings, logs } = json.data;
+
+      // Update local IndexedDB
+      try {
+        const db = await openDB();
+        const transaction = db.transaction(['sections', 'custody_items', 'settings', 'audit_logs'], 'readwrite');
+        const secStore = transaction.objectStore('sections');
+        const itemStore = transaction.objectStore('custody_items');
+        const setStore = transaction.objectStore('settings');
+        const logStore = transaction.objectStore('audit_logs');
+
+        secStore.clear();
+        itemStore.clear();
+        logStore.clear();
+
+        if (Array.isArray(sections)) {
+          for (const s of sections) secStore.put(s);
+        }
+        if (Array.isArray(items)) {
+          for (const i of items) itemStore.put(i);
+        }
+        if (Array.isArray(logs)) {
+          for (const l of logs) logStore.put(l);
+        }
+        if (settings) {
+          setStore.put({ key: 'main_settings', value: settings });
+        }
+      } catch (e) {
+        console.warn('Could not update local IndexedDB cache during cloud sync:', e);
+      }
+
+      // Update localStorage mirrors
+      if (typeof window !== 'undefined') {
+        if (Array.isArray(sections)) localStorage.setItem('pharma_sections', JSON.stringify(sections));
+        if (Array.isArray(items)) localStorage.setItem('pharma_custody_items', JSON.stringify(items));
+        if (settings) localStorage.setItem('pharma_settings', JSON.stringify(settings));
+        if (Array.isArray(logs)) localStorage.setItem('pharma_audit_logs', JSON.stringify(logs));
+        localStorage.setItem('pharma_db_seeded', 'true');
+      }
+
+      return { synced: true, sections, items, settings, logs };
+    }
+  } catch (err) {
+    console.warn('Cloud server sync unavailable, using local cache:', err);
+  }
+  return { synced: false };
+}
+
+export async function pushAllToCloudServer(): Promise<{ success: boolean; message?: string }> {
+  try {
+    const sections = await getSections();
+    const items = await getCustodyItems();
+    const settings = await getSettings();
+    const logs = await getAuditLogs();
+
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sections, items, settings, logs }),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    return { success: true, message: json.message };
+  } catch (err: any) {
+    console.warn('Push all to cloud failed:', err);
+    return { success: false, message: err.message };
+  }
+}
+

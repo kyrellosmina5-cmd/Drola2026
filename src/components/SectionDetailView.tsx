@@ -14,10 +14,13 @@ import {
   UserCheck,
   MapPin,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Share2,
+  Check
 } from 'lucide-react';
 import { Section, CustodyItem, FileType } from '../types';
 import { getSectionIcon, getColorTheme } from '../utils/icons';
+import { copyToClipboard, formatSectionShareText } from '../utils/clipboardHelpers';
 import { CustodyCard } from './CustodyCard';
 
 interface SectionDetailViewProps {
@@ -51,6 +54,29 @@ export const SectionDetailView: React.FC<SectionDetailViewProps> = ({
 }) => {
   const [activeType, setActiveType] = useState<'all' | FileType>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [copiedSection, setCopiedSection] = useState(false);
+
+  const handleCopySectionDetails = async () => {
+    const text = formatSectionShareText(section, items);
+
+    if (typeof navigator !== 'undefined' && 'share' in navigator && window.innerWidth < 768) {
+      try {
+        await navigator.share({
+          title: `كشف قسم ${section.name}`,
+          text: text,
+        });
+        return;
+      } catch {
+        // Fallback to clipboard
+      }
+    }
+
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedSection(true);
+      setTimeout(() => setCopiedSection(false), 2500);
+    }
+  };
 
   const IconComponent = getSectionIcon(section.iconName);
   const theme = getColorTheme(section.color);
@@ -89,6 +115,29 @@ export const SectionDetailView: React.FC<SectionDetailViewProps> = ({
 
         {/* Section Actions */}
         <div className="flex items-center gap-2">
+          <button
+            id="share-section-report-btn"
+            onClick={handleCopySectionDetails}
+            title="نسخ تفاصيل القسم وحصر عهده للمراسلة عبر واتساب وتيليجرام"
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl border font-bold text-xs sm:text-sm transition-all ${
+              copiedSection
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            {copiedSection ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                <span>تم نسخ الكشف!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <span className="hidden sm:inline">نسخ ومشاركة الكشف</span>
+              </>
+            )}
+          </button>
+
           <button
             id="print-section-report-btn"
             onClick={() => onPrintSection(section)}

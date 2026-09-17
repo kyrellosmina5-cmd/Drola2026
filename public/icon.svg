@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="pharmG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#pharmG)"/>
+  <path d="M256 90 L380 145 C380 270 256 390 256 422 C256 390 132 270 132 145 Z" fill="white" opacity="0.15"/>
+  <rect x="228" y="160" width="56" height="192" rx="20" fill="white"/>
+  <rect x="160" y="228" width="192" height="56" rx="20" fill="white"/>
+  <circle cx="360" cy="360" r="32" fill="#34d399"/>
+</svg>

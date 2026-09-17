@@ -16,10 +16,12 @@ import {
   Archive,
   AlertTriangle,
   Copy,
-  Check
+  Check,
+  Share2
 } from 'lucide-react';
 import { CustodyItem, CustodyStatus } from '../types';
 import { formatBytes, formatDateArabic, downloadFile, printFileContent } from '../utils/fileHelpers';
+import { copyToClipboard, formatCustodyItemShareText } from '../utils/clipboardHelpers';
 
 interface CustodyCardProps {
   item: CustodyItem;
@@ -41,6 +43,43 @@ export const CustodyCard: React.FC<CustodyCardProps> = ({
   onShowQr,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedDetails, setCopiedDetails] = useState(false);
+
+  const handleCopyCode = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (item.custodyNumber) {
+      const success = await copyToClipboard(item.custodyNumber);
+      if (success) {
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2200);
+      }
+    }
+  };
+
+  const handleCopyCustodyDetails = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = formatCustodyItemShareText(item, sectionName);
+    
+    // Check if mobile native share is available
+    if (typeof navigator !== 'undefined' && 'share' in navigator && window.innerWidth < 768) {
+      try {
+        await navigator.share({
+          title: item.title,
+          text: text,
+        });
+        return;
+      } catch {
+        // Fallback to clipboard copy if user dismissed or share failed
+      }
+    }
+
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedDetails(true);
+      setTimeout(() => setCopiedDetails(false), 2500);
+    }
+  };
 
   const handleCopyLink = () => {
     if (item.url) {
@@ -155,9 +194,24 @@ export const CustodyCard: React.FC<CustodyCardProps> = ({
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 {renderStatusBadge(item.status)}
                 {item.custodyNumber && (
-                  <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
-                    #{item.custodyNumber}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    title="اضغط لنسخ كود العهدة بضغطة زر إلى الحافظة"
+                    className="inline-flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 hover:bg-teal-50 dark:bg-slate-800 dark:hover:bg-teal-950/60 text-slate-700 hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300 border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-700 font-bold transition-all active:scale-95 cursor-pointer"
+                  >
+                    {copiedCode ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400">تم نسخ الكود!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-slate-400 hover:text-teal-600" />
+                        <span>#{item.custodyNumber}</span>
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
               <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-snug">
@@ -166,8 +220,24 @@ export const CustodyCard: React.FC<CustodyCardProps> = ({
             </div>
           </div>
 
-          {/* Edit/Delete Actions */}
+          {/* Edit/Delete Actions + Quick Copy */}
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              id={`share-item-${item.id}`}
+              onClick={handleCopyCustodyDetails}
+              title="نسخ تفاصيل العهدة لمشاركتها عبر الواتساب أو التطبيقات الخارجية"
+              className={`p-1.5 rounded-lg transition-colors ${
+                copiedDetails
+                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60'
+                  : 'text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/40'
+              }`}
+            >
+              {copiedDetails ? (
+                <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+            </button>
             <button
               id={`edit-item-${item.id}`}
               onClick={() => onEdit(item)}
@@ -272,6 +342,30 @@ export const CustodyCard: React.FC<CustodyCardProps> = ({
         >
           <Download className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">تحميل</span>
+        </button>
+
+        {/* Share & Copy Details */}
+        <button
+          id={`copy-details-item-${item.id}`}
+          onClick={handleCopyCustodyDetails}
+          title="نسخ تفاصيل العهدة كاملة للمراسلة الخارجية"
+          className={`inline-flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl font-bold text-xs transition-colors ${
+            copiedDetails
+              ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+          }`}
+        >
+          {copiedDetails ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+              <span className="text-[11px]">تم النسخ!</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span className="hidden sm:inline">مشاركة</span>
+            </>
+          )}
         </button>
 
         {/* Right: Print Button */}

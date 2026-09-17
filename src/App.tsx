@@ -17,6 +17,7 @@ import {
   getAuditLogs,
   addAuditLog,
   clearAuditLogs,
+  syncWithCloudServer,
   INITIAL_SECTIONS,
   INITIAL_ITEMS,
 } from './utils/storage';
@@ -32,7 +33,12 @@ import { CloudSyncModal } from './components/CloudSyncModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PinModal } from './components/PinModal';
 import { QrModal } from './components/QrModal';
+import { ShareModal } from './components/ShareModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { AddSectionBox } from './components/AddSectionBox';
+import { MobileInstallBanner } from './components/MobileInstallBanner';
+import { PWAInstallModal } from './components/PWAInstallModal';
+import { usePWAInstall } from './hooks/usePWAInstall';
 import { printComprehensiveReport } from './utils/printReport';
 import { Plus, FolderPlus, ShieldCheck, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
 
@@ -80,7 +86,10 @@ export default function App() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteConfirmTarget | null>(null);
+  const { isInstallable, isInstalled, isIOS, install: installPwa } = usePWAInstall();
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const [qrModal, setQrModal] = useState<{ isOpen: boolean; url: string; title: string }>({
     isOpen: false,
     url: '',
@@ -112,7 +121,17 @@ export default function App() {
 
     // Online/offline check
     setIsOnline(navigator.onLine);
-    const handleOnline = () => setIsOnline(true);
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncWithCloudServer().then(res => {
+        if (res.synced && res.sections) {
+          setSections(res.sections);
+          setItems(res.items || []);
+          if (res.settings) setSettings(res.settings);
+          if (res.logs) setLogs(res.logs);
+        }
+      });
+    };
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -129,16 +148,25 @@ export default function App() {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [secList, itemList, setObj, logList] = await Promise.all([
-        getSections(),
-        getCustodyItems(),
-        getSettings(),
-        getAuditLogs(),
-      ]);
-      setSections(secList);
-      setItems(itemList);
-      setSettings(setObj);
-      setLogs(logList);
+      // First attempt to synchronize with central cloud server
+      const cloudResult = await syncWithCloudServer();
+      if (cloudResult.synced && cloudResult.sections) {
+        setSections(cloudResult.sections);
+        setItems(cloudResult.items || []);
+        if (cloudResult.settings) setSettings(cloudResult.settings);
+        if (cloudResult.logs) setLogs(cloudResult.logs);
+      } else {
+        const [secList, itemList, setObj, logList] = await Promise.all([
+          getSections(),
+          getCustodyItems(),
+          getSettings(),
+          getAuditLogs(),
+        ]);
+        setSections(secList);
+        setItems(itemList);
+        setSettings(setObj);
+        setLogs(logList);
+      }
     } catch (err) {
       console.error('Failed to load database:', err);
     } finally {
@@ -436,6 +464,7 @@ export default function App() {
         logsCount={logs.length}
         onOpenNewSection={handleOpenNewSection}
         onOpenNewUpload={() => handleOpenUpload()}
+        onOpenShareModal={() => setIsShareModalOpen(true)}
       />
 
       {/* Main Container */}
@@ -482,19 +511,27 @@ export default function App() {
               isAdmin={isAdmin}
               onAddNewSection={handleOpenNewSection}
               onAddNewItem={() => handleOpenUpload()}
+              onOpenShareModal={() => setIsShareModalOpen(true)}
+            />
+
+            {/* Direct Front & Center: Add Section Box */}
+            <AddSectionBox
+              onAddSection={handleSaveSection}
+              onOpenFullModal={handleOpenNewSection}
+              sectionsCount={sections.length}
             />
 
             {/* Sections Grid Title & Quick Action */}
-            <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
               <div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <span>أقسام العهد الصيدلية</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
-                    {filteredSections.length} من أصل {sections.length}
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold border border-teal-200 dark:border-teal-800">
+                    {filteredSections.length} من أصل {sections.length} قسم
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  انقر على أيقونة أي قسم لإدارة واستعراض ورفع ملفات الـ PDF، الصور، الفيديوهات، والروابط
+                  انقر على أي قسم لإدارة واستعراض ورفع ملفات الـ PDF، الصور، الفيديوهات، والروابط
                 </p>
               </div>
 
@@ -502,10 +539,10 @@ export default function App() {
                 <button
                   id="add-section-top-btn"
                   onClick={handleOpenNewSection}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm shadow-teal-600/20 transition-all active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all active:scale-95"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>إضافة قسم</span>
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>نافذة إضافة وتخصيص قسم</span>
                 </button>
               </div>
             </div>
@@ -663,6 +700,14 @@ export default function App() {
         title={qrModal.title}
       />
 
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        pharmacyName={settings.pharmacyName}
+        branchName={settings.branchName}
+        onOpenPwaModal={() => setIsPwaModalOpen(true)}
+      />
+
       {/* Delete Confirmation Modal (Active & Iframe-Safe) */}
       <DeleteConfirmModal
         isOpen={deleteTarget !== null}
@@ -684,6 +729,25 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating Bottom Mobile PWA Install Banner */}
+      <MobileInstallBanner
+        isInstalled={isInstalled}
+        isInstallable={isInstallable}
+        isIOS={isIOS}
+        onInstall={installPwa}
+        onOpenModal={() => setIsPwaModalOpen(true)}
+      />
+
+      {/* Universal Mobile & Desktop PWA Installation & QR Modal */}
+      <PWAInstallModal
+        isOpen={isPwaModalOpen}
+        onClose={() => setIsPwaModalOpen(false)}
+        onTriggerInstall={installPwa}
+        isInstallable={isInstallable}
+        isIOS={isIOS}
+        isInstalled={isInstalled}
+      />
 
     </div>
   );
